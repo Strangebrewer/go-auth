@@ -107,7 +107,9 @@ Integration tests via testcontainers — real Postgres, no mocks. `TestMain` han
 - File naming: `user_handler.go`, `token_store.go`, etc.
 - Receiver names: `h` for handlers, `s` for stores, `svc` for the token service
 - Errors: log with `slog.Error` server-side, generic message to client
-- Routes function: `Routes(...) chi.Router`
+- Routes function signatures:
+  - `user.Routes(store *user.Store, svc *token.TokenService) chi.Router` — login needs to issue tokens
+  - `token.Routes(svc *token.TokenService) chi.Router` — no store needed directly; service owns store
 - Auth applied at mount point in `server/routes.go`
 
 ---
@@ -124,6 +126,16 @@ Integration tests via testcontainers — real Postgres, no mocks. `TestMain` han
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins |
 
 Copy `.env.example` to `.env.local` for local dev. Never commit `.env.local`.
+
+---
+
+## Current State
+
+- Module renamed to `github.com/Strangebrewer/go-auth`, all import paths updated
+- `config/config.go` extended with `JWT_PRIVATE_KEY`, `RefreshTokenPepper`
+- `.env.example` updated with all auth-specific vars
+- Ground zero committed to `main` — template boilerplate intact, no domain code written yet
+- **Next**: write `db/schema.sql` and migrations, then `user/` and `token/` domains
 
 ---
 
