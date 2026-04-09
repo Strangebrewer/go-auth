@@ -1,14 +1,10 @@
-# go-service-template — Claude Context
+# go-auth — Claude Context
 
-## What This Repo Is
+## What This Service Is
 
-A GitHub template repository for Go REST services in the personal-enterprise project. It provides the full structural skeleton — chi router, JWT auth middleware, structured logging, Postgres connection, sqlc setup, golang-migrate, testcontainers integration tests, Dockerfile, and CI — so new services can be created without rebuilding boilerplate from scratch.
+The authentication service for the personal-enterprise project. It is the **only** service that owns JWT issuance — all other services validate JWTs independently using only the public key. This service manages users, issues access + refresh token pairs, and handles token rotation and revocation.
 
-When a concrete service is created from this template, the first things to change are:
-1. The module name in `go.mod` (e.g. `github.com/Strangebrewer/go-auth`) and all import paths throughout the codebase
-2. The `example/` package — replace with real domain packages
-3. `app/app.go` — replace `ExampleStore` with real stores
-4. `server/routes.go` — replace example route registration with real routes
+Built from `go-service-template`. The structure, patterns, and tooling are inherited from that template — this file documents what is specific to go-auth on top of that foundation.
 
 ---
 
@@ -16,84 +12,103 @@ When a concrete service is created from this template, the first things to chang
 
 ```
 cmd/
-  server/main.go     ← wiring only: config, DB, stores, server.New(), graceful shutdown
-  migrate/main.go    ← runs golang-migrate up/down against DATABASE_URL
+  server/main.go     ← wiring: config, DB, stores, token service, server.New()
+  migrate/main.go    ← golang-migrate runner
 app/
-  app.go             ← Application struct aggregating all domain stores
+  app.go             ← Application struct: UserStore, TokenStore, TokenService
 server/
-  server.go          ← chi router, global middleware, returns *Server
-  routes.go          ← mounts domain routes with auth middleware
+  server.go          ← chi router, global middleware
+  routes.go          ← route registration
 config/
-  config.go          ← loads .env.local + env vars into Config struct
+  config.go          ← Config struct — extended with auth-specific fields
 db_connection/
-  db.go              ← creates and pings a pgxpool.Pool
+  db.go              ← pgxpool setup
 db/
-  schema.sql         ← sqlc reads this for type generation
-  sqlc.yaml          ← sqlc config: engine, query/schema paths, output package
-  queries/           ← named SQL queries (.sql files) for sqlc to generate from
-  migrations/        ← golang-migrate migration files (up + down pairs)
-  generated/         ← sqlc output — committed, not gitignored
+  schema.sql         ← users + refresh_tokens tables
+  sqlc.yaml
+  queries/           ← user and token queries
+  migrations/
+  generated/
 health/
-  handler.go         ← GET /health → 200 {"status":"ok"}
+  handler.go
 middleware/
-  auth.go            ← RequireAuth(pemString) parses RSA public key once, returns middleware
-  logging.go         ← structured slog request logging with status code capture
-  requestid.go       ← generates/propagates X-Request-ID, injects into context
-example/
-  example_model.go   ← Example struct + CreateExampleRequest/UpdateExampleRequest DTOs
-  example_store.go   ← Store wrapping pgxpool.Pool; stubbed CRUD showing sqlc pattern
-  example_handler.go ← Handler with GetAll/GetOne/Create/Update/Delete methods
-  example_routes.go  ← Routes(store) returns chi.Router with all endpoints registered
-  example_test.go    ← testcontainers integration test skeleton (tests skip until implemented)
+  auth.go            ← RequireAuth — used for protected endpoints (e.g. /me, /logout)
+  logging.go
+  requestid.go
+user/
+  user_model.go
+  user_store.go
+  user_handler.go    ← register, login
+  user_routes.go
+token/
+  token_model.go
+  token_store.go     ← refresh token persistence (Postgres)
+  token_service.go   ← JWT issuance, verification, rotation, revocation
+  token_handler.go   ← refresh, logout
+  token_routes.go
 ```
 
 ---
 
-## Key Patterns
+## Key Differences from Other Go Services
 
-### Adding a Domain
+### Token Service
 
-Follow the `example/` package as the structural template:
+go-auth has a `token/token_service.go` — a service layer between handler and store. This is the only domain in any Go service that warrants a service layer (per the architecture: service layer only where there's real logic beyond CRUD).
 
-1. Create `<domain>/<domain>_model.go`, `_store.go`, `_handler.go`, `_routes.go`
-2. Add `<Domain>Store *<domain>.Store` to `app/app.go`
-3. Instantiate the store in `cmd/server/main.go` and add to `Application`
-4. Mount routes in `server/routes.go`
+The token service owns:
+- Minting access JWTs (RSA-signed, 15 min TTL)
+- Minting refresh tokens (random bytes, stored as SHA-256 hash + pepper)
+- Token rotation on refresh (revoke old, issue new pair)
+- Revocation on logout
 
-### Auth
+### Auth Middleware Usage
 
-`middleware.RequireAuth(cfg.JWTPublicKey)` parses the RSA public key PEM once at startup and returns a `func(http.Handler) http.Handler`. It validates Bearer JWTs and injects the user ID (string UUID from the `sub` claim) into context. Retrieve it in handlers via `middleware.UserIDFromContext(r.Context())`.
+Unlike other services which apply `middleware.RequireAuth` broadly, go-auth applies it selectively:
+- **Unprotected**: `POST /users/register`, `POST /users/login`, `POST /token/refresh`
+- **Protected**: `GET /users/me`, `POST /token/logout`
 
-Auth is applied at the mount point in `server/routes.go`, not inside individual route files.
+### Both RSA Keys Required
 
-### Database
+Other services only need `JWT_PUBLIC_KEY`. go-auth needs both:
+- `JWT_PRIVATE_KEY` — for signing access tokens
+- `JWT_PUBLIC_KEY` — for verifying access tokens on protected endpoints
+- `REFRESH_TOKEN_PEPPER` — mixed into refresh token hashing
 
-- `db_connection.NewPool(cfg.DatabaseURL)` — call once in main, pass pool to stores
-- `sqlc generate` — run from the `db/` directory after modifying schema or queries. Output goes to `db/generated/` and is committed.
-- `go run ./cmd/migrate [up|down]` — run from the repo root. `down` rolls back one step.
-- Migration files follow golang-migrate naming: `000001_create_things.up.sql` / `000001_create_things.down.sql`
-- The migrate command rewrites `postgres://` → `pgx5://` internally — `DATABASE_URL` format in `.env.local` doesn't need to change.
+### Password Hashing
 
-### Logging
-
-`slog.SetDefault(logger)` is called in `main.go` before anything else. After that, all packages can call `slog.Info/Error/etc.` directly without receiving a logger as a parameter. The logger writes JSON to stdout, which Cloud Run ingests into Cloud Logging automatically.
-
-### Testing
-
-Integration tests use testcontainers to spin up a real Postgres container. `TestMain` handles container lifecycle — start, apply schema, create pool, tear down. Individual test functions use `t.Skip(...)` as placeholders until store methods are implemented. Remove the skip calls when implementing a concrete service.
+argon2id via `golang.org/x/crypto`. Never bcrypt.
 
 ---
 
-## Conventions
+## Patterns Carried Over from Template
 
-- File naming: `<domain>_handler.go`, `<domain>_store.go`, etc. — not just `handler.go`
-- Default exports for nothing — this is Go, everything is package-scoped
-- Receiver names: `h` for handlers, `s` for stores
-- Store methods: `GetAll`, `GetOne`, `Create`, `Update`, `Delete`
-- Handler methods follow the same verbs
-- Routes function signature: `Routes(store *Store) chi.Router`
-- Errors: log with `slog.Error` server-side, return generic message to client — never leak internal details
-- Monetary values as integers (cents) if this service handles money
+### Domain Structure
+
+Four-file pattern per domain: `<domain>_model.go`, `_store.go`, `_handler.go`, `_routes.go`. Token adds a fifth: `token_service.go`.
+
+### Database
+
+- sqlc for all queries — no raw SQL strings in handlers or stores
+- golang-migrate for migrations: `go run ./cmd/migrate [up|down]`
+- Migration files: `000001_create_users.up.sql` / `000001_create_users.down.sql`
+- `db/generated/` is committed
+
+### Logging
+
+`slog.SetDefault(logger)` in main. JSON to stdout. All packages use `slog` directly.
+
+### Testing
+
+Integration tests via testcontainers — real Postgres, no mocks. `TestMain` handles container lifecycle.
+
+### Conventions
+
+- File naming: `user_handler.go`, `token_store.go`, etc.
+- Receiver names: `h` for handlers, `s` for stores, `svc` for the token service
+- Errors: log with `slog.Error` server-side, generic message to client
+- Routes function: `Routes(...) chi.Router`
+- Auth applied at mount point in `server/routes.go`
 
 ---
 
@@ -103,7 +118,17 @@ Integration tests use testcontainers to spin up a real Postgres container. `Test
 |---|---|
 | `PORT` | HTTP port (defaults to 8080) |
 | `DATABASE_URL` | Postgres connection string (`postgres://user:pass@host/db`) |
-| `JWT_PUBLIC_KEY` | RSA public key PEM for validating JWTs issued by go-auth |
+| `JWT_PRIVATE_KEY` | RSA private key PEM for signing access tokens |
+| `JWT_PUBLIC_KEY` | RSA public key PEM for verifying access tokens on protected endpoints |
+| `REFRESH_TOKEN_PEPPER` | Secret mixed into refresh token hashing |
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins |
 
 Copy `.env.example` to `.env.local` for local dev. Never commit `.env.local`.
+
+---
+
+## Decided
+
+- **User IDs**: UUIDv7 — time-ordered (good for index locality), privacy-safe in JWTs, generated via `uuid.NewV7()` from `github.com/google/uuid`
+- **No `/token/public-key` endpoint** — `JWT_PUBLIC_KEY` is an env var injected via GCP Secret Manager at deploy time. An endpoint that serves key material is unnecessary attack surface and introduces a startup dependency.
+- **Schema**: work out when writing `db/schema.sql` — details depend on what sqlc queries and the token service actually need.

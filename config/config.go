@@ -8,10 +8,12 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DatabaseURL    string
-	JWTPublicKey   string
-	AllowedOrigins []string
+	Port                string
+	DatabaseURL         string
+	JWTPrivateKey       string
+	JWTPublicKey        string
+	RefreshTokenPepper  string
+	AllowedOrigins      []string
 }
 
 func parseOrigins(s string) []string {
@@ -27,9 +29,11 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:           os.Getenv("PORT"),
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		JWTPublicKey:   os.Getenv("JWT_PUBLIC_KEY"),
-		AllowedOrigins: parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		Port:               os.Getenv("PORT"),
+		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		JWTPrivateKey:      os.Getenv("JWT_PRIVATE_KEY"),
+		JWTPublicKey:       os.Getenv("JWT_PUBLIC_KEY"),
+		RefreshTokenPepper: os.Getenv("REFRESH_TOKEN_PEPPER"),
+		AllowedOrigins:     parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 	}
 }
