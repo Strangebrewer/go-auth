@@ -13,9 +13,10 @@ import (
 	"github.com/Strangebrewer/go-auth/app"
 	"github.com/Strangebrewer/go-auth/config"
 	"github.com/Strangebrewer/go-auth/db_connection"
-	"github.com/Strangebrewer/go-auth/example"
 	"github.com/Strangebrewer/go-auth/middleware"
 	"github.com/Strangebrewer/go-auth/server"
+	"github.com/Strangebrewer/go-auth/token"
+	"github.com/Strangebrewer/go-auth/user"
 )
 
 func main() {
@@ -37,8 +38,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	tokenStore := token.NewStore(pool)
+	tokenService, err := token.NewService(tokenStore, cfg.JWTPrivateKey, cfg.RefreshTokenPepper)
+	if err != nil {
+		slog.Error("failed to initialize token service", "error", err)
+		os.Exit(1)
+	}
+
 	application := &app.Application{
-		ExampleStore: example.NewStore(pool),
+		UserStore:    user.NewStore(pool),
+		TokenService: tokenService,
 	}
 
 	port := cfg.Port
