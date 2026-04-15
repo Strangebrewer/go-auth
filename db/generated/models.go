@@ -12,19 +12,19 @@ import (
 )
 
 type RefreshToken struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Hash      string
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	RevokedAt pgtype.Timestamptz
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"userId"`
+	Hash      string             `json:"hash"`
+	ExpiresAt time.Time          `json:"expiresAt"`
+	CreatedAt time.Time          `json:"createdAt"`
+	RevokedAt pgtype.Timestamptz `json:"revokedAt"`
 }
 
 type User struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Disabled     bool
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"passwordHash"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	Disabled     bool      `json:"disabled"`
 }

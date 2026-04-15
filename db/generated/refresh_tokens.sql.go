@@ -19,11 +19,11 @@ RETURNING id, user_id, hash, expires_at, created_at, revoked_at
 `
 
 type CreateRefreshTokenParams struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Hash      string
-	ExpiresAt time.Time
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"userId"`
+	Hash      string    `json:"hash"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {

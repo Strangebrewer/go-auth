@@ -19,11 +19,11 @@ RETURNING id, email, password_hash, created_at, updated_at, disabled
 `
 
 type CreateUserParams struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"passwordHash"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
