@@ -10,7 +10,7 @@ func Routes(svc *Service, authMiddleware func(http.Handler) http.Handler) chi.Ro
 	h := NewHandler(svc)
 	r := chi.NewRouter()
 
-	r.Post("/refresh", h.Refresh)
+	r.Post("/exchange", h.Refresh)
 	r.With(authMiddleware).Post("/logout", h.Logout)
 
 	return r
