@@ -1,6 +1,19 @@
 package user
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type User struct {
+	ID           uuid.UUID
+	Email        string
+	PasswordHash string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Disabled     bool
+}
 
 type PublicUser struct {
 	ID    string `json:"id"`

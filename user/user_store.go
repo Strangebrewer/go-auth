@@ -8,11 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/Strangebrewer/go-auth/db/generated"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 var (
@@ -22,66 +19,93 @@ var (
 	ErrNotFound           = errors.New("user not found")
 )
 
+type userDoc struct {
+	ID           string    `bson:"_id"`
+	Email        string    `bson:"email"`
+	PasswordHash string    `bson:"passwordHash"`
+	CreatedAt    time.Time `bson:"createdAt"`
+	UpdatedAt    time.Time `bson:"updatedAt"`
+	Disabled     bool      `bson:"disabled"`
+}
+
+func (d userDoc) toDomain() (User, error) {
+	id, err := uuid.Parse(d.ID)
+	if err != nil {
+		return User{}, fmt.Errorf("parse user id: %w", err)
+	}
+	return User{
+		ID:           id,
+		Email:        d.Email,
+		PasswordHash: d.PasswordHash,
+		CreatedAt:    d.CreatedAt,
+		UpdatedAt:    d.UpdatedAt,
+		Disabled:     d.Disabled,
+	}, nil
+}
+
 type Store struct {
-	q *db.Queries
+	col *mongo.Collection
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{q: db.New(pool)}
+func NewStore(db *mongo.Database) *Store {
+	return &Store{col: db.Collection("users")}
 }
 
-func (s *Store) Create(ctx context.Context, email, password string) (db.User, error) {
+func (s *Store) Create(ctx context.Context, email, password string) (User, error) {
 	email = normalizeEmail(email)
 
 	hash, err := hashPassword(password)
 	if err != nil {
-		return db.User{}, fmt.Errorf("hash password: %w", err)
+		return User{}, fmt.Errorf("hash password: %w", err)
 	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
-		return db.User{}, fmt.Errorf("generate id: %w", err)
+		return User{}, fmt.Errorf("generate id: %w", err)
 	}
 
 	now := time.Now().UTC()
-	u, err := s.q.CreateUser(ctx, db.CreateUserParams{
-		ID:           id,
+	doc := userDoc{
+		ID:           id.String(),
 		Email:        email,
 		PasswordHash: hash,
 		CreatedAt:    now,
 		UpdatedAt:    now,
-	})
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return db.User{}, ErrEmailExists
-		}
-		return db.User{}, fmt.Errorf("create user: %w", err)
+		Disabled:     false,
 	}
 
-	return u, nil
+	if _, err := s.col.InsertOne(ctx, doc); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return User{}, ErrEmailExists
+		}
+		return User{}, fmt.Errorf("create user: %w", err)
+	}
+
+	return doc.toDomain()
 }
 
-func (s *Store) FindByEmail(ctx context.Context, email string) (db.User, error) {
-	u, err := s.q.GetUserByEmail(ctx, normalizeEmail(email))
+func (s *Store) FindByEmail(ctx context.Context, email string) (User, error) {
+	var doc userDoc
+	err := s.col.FindOne(ctx, bson.D{{Key: "email", Value: normalizeEmail(email)}}).Decode(&doc)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.User{}, ErrNotFound
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return User{}, ErrNotFound
 		}
-		return db.User{}, fmt.Errorf("find user by email: %w", err)
+		return User{}, fmt.Errorf("find user by email: %w", err)
 	}
-	return u, nil
+	return doc.toDomain()
 }
 
-func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (db.User, error) {
-	u, err := s.q.GetUserByID(ctx, id)
+func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (User, error) {
+	var doc userDoc
+	err := s.col.FindOne(ctx, bson.D{{Key: "_id", Value: id.String()}}).Decode(&doc)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.User{}, ErrNotFound
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return User{}, ErrNotFound
 		}
-		return db.User{}, fmt.Errorf("find user by id: %w", err)
+		return User{}, fmt.Errorf("find user by id: %w", err)
 	}
-	return u, nil
+	return doc.toDomain()
 }
 
 func normalizeEmail(s string) string {
