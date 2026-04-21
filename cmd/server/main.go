@@ -25,12 +25,17 @@ func main() {
 
 	cfg := config.Load()
 
-	pool, err := db_connection.NewPool(cfg.DatabaseURL)
+	ctx := context.Background()
+	mongoClient, db, err := db_connection.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
+	defer func() {
+		if err := mongoClient.Disconnect(context.Background()); err != nil {
+			slog.Error("failed to disconnect from database", "error", err)
+		}
+	}()
 
 	authMiddleware, err := middleware.RequireAuth(cfg.JWTPublicKey)
 	if err != nil {
@@ -38,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	tokenStore := token.NewStore(pool)
+	tokenStore := token.NewStore(db)
 	tokenService, err := token.NewService(tokenStore, cfg.JWTPrivateKey, cfg.RefreshTokenPepper)
 	if err != nil {
 		slog.Error("failed to initialize token service", "error", err)
@@ -46,7 +51,7 @@ func main() {
 	}
 
 	application := &app.Application{
-		UserStore:    user.NewStore(pool),
+		UserStore:    user.NewStore(db),
 		TokenService: tokenService,
 	}
 
@@ -70,10 +75,10 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.HTTPServer.Shutdown(ctx); err != nil {
+	if err := srv.HTTPServer.Shutdown(shutCtx); err != nil {
 		slog.Error("server shutdown failed", "error", err)
 		os.Exit(1)
 	}
