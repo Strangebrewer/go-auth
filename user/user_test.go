@@ -6,12 +6,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
+	tcmongo "github.com/testcontainers/testcontainers-go/modules/mongodb"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/Strangebrewer/go-auth/user"
 )
@@ -21,45 +21,38 @@ var testStore *user.Store
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
-	pgContainer, err := tcpostgres.Run(ctx,
-		"postgres:16-alpine",
-		tcpostgres.WithDatabase("testdb"),
-		tcpostgres.WithUsername("test"),
-		tcpostgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2),
-		),
-	)
+	mongoContainer, err := tcmongo.Run(ctx, "mongo:6")
 	if err != nil {
-		log.Fatalf("failed to start postgres container: %v", err)
+		log.Fatalf("failed to start mongodb container: %v", err)
 	}
 	defer func() {
-		if err := pgContainer.Terminate(ctx); err != nil {
+		if err := mongoContainer.Terminate(ctx); err != nil {
 			log.Printf("failed to terminate container: %v", err)
 		}
 	}()
 
-	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
+	connStr, err := mongoContainer.ConnectionString(ctx)
 	if err != nil {
 		log.Fatalf("failed to get connection string: %v", err)
 	}
 
-	pool, err := pgxpool.New(ctx, connStr)
+	client, err := mongo.Connect(options.Client().ApplyURI(connStr))
 	if err != nil {
-		log.Fatalf("failed to create pool: %v", err)
+		log.Fatalf("failed to connect to mongodb: %v", err)
 	}
-	defer pool.Close()
+	defer client.Disconnect(ctx)
 
-	schema, err := os.ReadFile("../db/schema.sql")
+	db := client.Database("auth_test")
+
+	_, err = db.Collection("users").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "email", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
 	if err != nil {
-		log.Fatalf("failed to read schema: %v", err)
-	}
-	if _, err := pool.Exec(ctx, string(schema)); err != nil {
-		log.Fatalf("failed to apply schema: %v", err)
+		log.Fatalf("failed to create user indexes: %v", err)
 	}
 
-	testStore = user.NewStore(pool)
+	testStore = user.NewStore(db)
 
 	os.Exit(m.Run())
 }

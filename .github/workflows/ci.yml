@@ -61,7 +61,6 @@ jobs:
             --platform managed \
             --max-instances 2 \
             --service-account ${{ env.SERVICE_ACCOUNT }} \
-            --add-cloudsql-instances ${{ env.CLOUD_SQL_INSTANCE }} \
             --set-secrets DATABASE_URL=db-url-auth:latest,JWT_PUBLIC_KEY=jwt-public-key:latest,JWT_PRIVATE_KEY=jwt-private-key:latest,REFRESH_TOKEN_PEPPER=refresh-token-pepper:latest \
             --set-env-vars ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }} \
             --allow-unauthenticated
@@ -99,7 +98,6 @@ jobs:
             --platform managed \
             --max-instances 2 \
             --service-account ${{ env.SERVICE_ACCOUNT }} \
-            --add-cloudsql-instances ${{ env.CLOUD_SQL_INSTANCE }} \
             --set-secrets DATABASE_URL=db-url-auth:latest,JWT_PUBLIC_KEY=jwt-public-key:latest,JWT_PRIVATE_KEY=jwt-private-key:latest,REFRESH_TOKEN_PEPPER=refresh-token-pepper:latest \
             --set-env-vars ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }} \
             --allow-unauthenticated

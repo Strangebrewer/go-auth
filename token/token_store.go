@@ -2,21 +2,49 @@ package token
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/Strangebrewer/go-auth/db/generated"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-type Store struct {
-	q *db.Queries
+type refreshTokenDoc struct {
+	ID        string     `bson:"_id"`
+	UserID    string     `bson:"userId"`
+	Hash      string     `bson:"hash"`
+	ExpiresAt time.Time  `bson:"expiresAt"`
+	CreatedAt time.Time  `bson:"createdAt"`
+	RevokedAt *time.Time `bson:"revokedAt"`
 }
 
-func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{q: db.New(pool)}
+func (d refreshTokenDoc) toDomain() (RefreshToken, error) {
+	id, err := uuid.Parse(d.ID)
+	if err != nil {
+		return RefreshToken{}, fmt.Errorf("parse token id: %w", err)
+	}
+	userID, err := uuid.Parse(d.UserID)
+	if err != nil {
+		return RefreshToken{}, fmt.Errorf("parse token userId: %w", err)
+	}
+	return RefreshToken{
+		ID:        id,
+		UserID:    userID,
+		Hash:      d.Hash,
+		ExpiresAt: d.ExpiresAt,
+		CreatedAt: d.CreatedAt,
+		RevokedAt: d.RevokedAt,
+	}, nil
+}
+
+type Store struct {
+	col *mongo.Collection
+}
+
+func NewStore(db *mongo.Database) *Store {
+	return &Store{col: db.Collection("refresh_tokens")}
 }
 
 func (s *Store) Create(ctx context.Context, userID uuid.UUID, hash string, expiresAt time.Time) error {
@@ -25,24 +53,50 @@ func (s *Store) Create(ctx context.Context, userID uuid.UUID, hash string, expir
 		return fmt.Errorf("generate id: %w", err)
 	}
 
-	_, err = s.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
-		ID:        id,
-		UserID:    userID,
+	doc := refreshTokenDoc{
+		ID:        id.String(),
+		UserID:    userID.String(),
 		Hash:      hash,
 		ExpiresAt: expiresAt,
 		CreatedAt: time.Now().UTC(),
-	})
+		RevokedAt: nil,
+	}
+
+	_, err = s.col.InsertOne(ctx, doc)
 	return err
 }
 
-func (s *Store) FindActiveByHash(ctx context.Context, hash string) (db.RefreshToken, error) {
-	return s.q.GetActiveRefreshTokenByHash(ctx, hash)
+func (s *Store) FindActiveByHash(ctx context.Context, hash string) (RefreshToken, error) {
+	filter := bson.D{
+		{Key: "hash", Value: hash},
+		{Key: "revokedAt", Value: nil},
+		{Key: "expiresAt", Value: bson.D{{Key: "$gt", Value: time.Now().UTC()}}},
+	}
+
+	var doc refreshTokenDoc
+	err := s.col.FindOne(ctx, filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return RefreshToken{}, ErrInvalidToken
+		}
+		return RefreshToken{}, fmt.Errorf("find active token: %w", err)
+	}
+	return doc.toDomain()
 }
 
 func (s *Store) RevokeByID(ctx context.Context, id uuid.UUID) error {
-	return s.q.RevokeRefreshToken(ctx, id)
+	filter := bson.D{{Key: "_id", Value: id.String()}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "revokedAt", Value: time.Now().UTC()}}}}
+	_, err := s.col.UpdateOne(ctx, filter, update)
+	return err
 }
 
 func (s *Store) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error {
-	return s.q.RevokeAllUserRefreshTokens(ctx, userID)
+	filter := bson.D{
+		{Key: "userId", Value: userID.String()},
+		{Key: "revokedAt", Value: nil},
+	}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "revokedAt", Value: time.Now().UTC()}}}}
+	_, err := s.col.UpdateMany(ctx, filter, update)
+	return err
 }
