@@ -13,22 +13,15 @@ Built from `go-service-template`. The structure, patterns, and tooling are inher
 ```
 cmd/
   server/main.go     ← wiring: config, DB, stores, token service, server.New()
-  migrate/main.go    ← golang-migrate runner
 app/
-  app.go             ← Application struct: UserStore, TokenStore, TokenService
+  app.go             ← Application struct: UserStore, TokenService
 server/
   server.go          ← chi router, global middleware
   routes.go          ← route registration
 config/
   config.go          ← Config struct — extended with auth-specific fields
 db_connection/
-  db.go              ← pgxpool setup
-db/
-  schema.sql         ← users + refresh_tokens tables
-  sqlc.yaml
-  queries/           ← user and token queries
-  migrations/
-  generated/
+  db.go              ← MongoDB Connect() — returns (*mongo.Client, *mongo.Database), creates indexes
 health/
   handler.go
 middleware/
@@ -36,13 +29,13 @@ middleware/
   logging.go
   requestid.go
 user/
-  user_model.go
-  user_store.go
+  user_model.go      ← User struct (domain), PublicUser, CreateUserRequest, LoginResponse
+  user_store.go      ← MongoDB store; internal userDoc with bson tags
   user_handler.go    ← register, login
   user_routes.go
 token/
-  token_model.go
-  token_store.go     ← refresh token persistence (Postgres)
+  token_model.go     ← ExchangeResult, RefreshToken (domain)
+  token_store.go     ← MongoDB store; internal refreshTokenDoc with bson tags
   token_service.go   ← JWT issuance, verification, rotation, revocation
   token_handler.go   ← refresh, logout
   token_routes.go
@@ -81,18 +74,42 @@ argon2id via `golang.org/x/crypto`. Never bcrypt.
 
 ---
 
+## Database
+
+MongoDB Atlas. Database name: `auth`. Collections: `users`, `refresh_tokens`.
+
+### Store pattern
+
+Stores define a private doc struct with `bson` tags for MongoDB serialization, and a domain struct (in `_model.go`) with plain Go types for everything outside the store. The store's methods convert between the two. This keeps bson tags out of the domain layer and handlers unchanged if the DB ever changes again.
+
+```
+userDoc (bson)  ←→  User (domain)         — in user/
+refreshTokenDoc (bson)  ←→  RefreshToken (domain)  — in token/
+```
+
+IDs are stored as strings (`uuid.UUID.String()`), parsed back to `uuid.UUID` on read.
+
+### Indexes (created at startup in db_connection/db.go)
+
+- `users.email` — unique
+- `refresh_tokens.hash` — for active token lookup
+- `refresh_tokens.userId` — for RevokeAllForUser
+
+### Active token query
+
+`revokedAt` is stored as `null` (not omitted) on new tokens so the filter `{revokedAt: null, expiresAt: {$gt: now}}` works correctly. Do not add `omitempty` to `refreshTokenDoc.RevokedAt`.
+
+### Connection string
+
+`DATABASE_URL` is a MongoDB URI (`mongodb+srv://user:pass@cluster.mongodb.net/`). No database name in the URI — the database is selected in code via `client.Database("auth")`. Secret Manager secret: `db-url-auth`. **Trailing newlines in the secret value will cause auth failures** — Secret Manager doesn't make them visible in the UI.
+
+---
+
 ## Patterns Carried Over from Template
 
 ### Domain Structure
 
 Four-file pattern per domain: `<domain>_model.go`, `_store.go`, `_handler.go`, `_routes.go`. Token adds a fifth: `token_service.go`.
-
-### Database
-
-- sqlc for all queries — no raw SQL strings in handlers or stores
-- golang-migrate for migrations: `go run ./cmd/migrate [up|down]`
-- Migration files: `000001_create_users.up.sql` / `000001_create_users.down.sql`
-- `db/generated/` is committed
 
 ### Logging
 
@@ -100,7 +117,7 @@ Four-file pattern per domain: `<domain>_model.go`, `_store.go`, `_handler.go`, `
 
 ### Testing
 
-Integration tests via testcontainers — real Postgres, no mocks. `TestMain` handles container lifecycle.
+Integration tests via testcontainers — `mongo:6` container, no mocks. `TestMain` handles container lifecycle.
 
 ### Conventions
 
@@ -119,7 +136,7 @@ Integration tests via testcontainers — real Postgres, no mocks. `TestMain` han
 | Variable | Description |
 |---|---|
 | `PORT` | HTTP port (defaults to 8080) |
-| `DATABASE_URL` | Postgres connection string (`postgres://user:pass@host/db`) |
+| `DATABASE_URL` | MongoDB URI (`mongodb+srv://user:pass@cluster.mongodb.net/`) |
 | `JWT_PRIVATE_KEY` | RSA private key PEM for signing access tokens |
 | `JWT_PUBLIC_KEY` | RSA public key PEM for verifying access tokens on protected endpoints |
 | `REFRESH_TOKEN_PEPPER` | Secret mixed into refresh token hashing |
@@ -131,16 +148,15 @@ Copy `.env.example` to `.env.local` for local dev. Never commit `.env.local`.
 
 ## Current State
 
-- Module renamed to `github.com/Strangebrewer/go-auth`, all import paths updated
-- `config/config.go` extended with `JWT_PRIVATE_KEY`, `RefreshTokenPepper`
-- `.env.example` updated with all auth-specific vars
-- Ground zero committed to `main` — template boilerplate intact, no domain code written yet
-- **Next**: write `db/schema.sql` and migrations, then `user/` and `token/` domains
+- Fully implemented and deployed to dev
+- MongoDB migration complete — no Postgres, no sqlc, no golang-migrate
+- User registration, login, JWT issuance, token rotation, and revocation all working
+- CI/CD: `--add-cloudsql-instances` removed from deploy steps (no longer needed)
 
 ---
 
 ## Decided
 
-- **User IDs**: UUIDv7 — time-ordered (good for index locality), privacy-safe in JWTs, generated via `uuid.NewV7()` from `github.com/google/uuid`
+- **User IDs**: UUIDv7 — time-ordered, privacy-safe in JWTs, generated via `uuid.NewV7()` from `github.com/google/uuid`
 - **No `/token/public-key` endpoint** — `JWT_PUBLIC_KEY` is an env var injected via GCP Secret Manager at deploy time. An endpoint that serves key material is unnecessary attack surface and introduces a startup dependency.
-- **Schema**: work out when writing `db/schema.sql` — details depend on what sqlc queries and the token service actually need.
+- **No database name in URI** — database selected in code (`client.Database("auth")`), not in the connection string
