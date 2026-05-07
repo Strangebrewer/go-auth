@@ -13,6 +13,6 @@ import (
 
 func registerRoutes(r chi.Router, application *app.Application, authMiddleware func(http.Handler) http.Handler) {
 	r.Get("/health", health.Handler)
-	r.Mount("/users", user.Routes(application.UserStore, application.TokenService, authMiddleware))
-	r.Mount("/token", token.Routes(application.TokenService, authMiddleware))
+	r.Mount("/users", user.Routes(application.UserStore, application.TokenService, application.Tracer, authMiddleware))
+	r.Mount("/token", token.Routes(application.TokenService, application.Tracer, authMiddleware))
 }

@@ -14,6 +14,8 @@ type Config struct {
 	JWTPublicKey        string
 	RefreshTokenPepper  string
 	AllowedOrigins      []string
+	TracerURL           string
+	TracerKey           string
 }
 
 func parseOrigins(s string) []string {
@@ -35,5 +37,7 @@ func Load() *Config {
 		JWTPublicKey:       os.Getenv("JWT_PUBLIC_KEY"),
 		RefreshTokenPepper: os.Getenv("REFRESH_TOKEN_PEPPER"),
 		AllowedOrigins:     parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		TracerURL:          os.Getenv("TRACER_SERVICE_URL"),
+		TracerKey:          os.Getenv("TRACER_SERVICE_KEY"),
 	}
 }

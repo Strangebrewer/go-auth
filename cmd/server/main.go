@@ -16,6 +16,7 @@ import (
 	"github.com/Strangebrewer/go-auth/middleware"
 	"github.com/Strangebrewer/go-auth/server"
 	"github.com/Strangebrewer/go-auth/token"
+	"github.com/Strangebrewer/go-auth/tracer"
 	"github.com/Strangebrewer/go-auth/user"
 )
 
@@ -53,6 +54,7 @@ func main() {
 	application := &app.Application{
 		UserStore:    user.NewStore(db),
 		TokenService: tokenService,
+		Tracer:       tracer.NewClient(cfg.TracerURL, cfg.TracerKey, "go-auth"),
 	}
 
 	port := cfg.Port
