@@ -52,9 +52,10 @@ func main() {
 	}
 
 	application := &app.Application{
-		UserStore:    user.NewStore(db),
-		TokenService: tokenService,
-		Tracer:       tracer.NewClient(cfg.TracerURL, cfg.TracerKey, "go-auth"),
+		UserStore:       user.NewStore(db),
+		TokenService:    tokenService,
+		Tracer:          tracer.NewClient(cfg.TracerURL, cfg.TracerKey, "go-auth"),
+		RubeOwidNextURL: cfg.RubeOwidNextURL,
 	}
 
 	port := cfg.Port

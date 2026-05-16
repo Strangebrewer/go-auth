@@ -16,6 +16,7 @@ type Config struct {
 	AllowedOrigins      []string
 	TracerURL           string
 	TracerKey           string
+	RubeOwidNextURL     string
 }
 
 func parseOrigins(s string) []string {
@@ -39,5 +40,6 @@ func Load() *Config {
 		AllowedOrigins:     parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		TracerURL:          os.Getenv("TRACER_SERVICE_URL"),
 		TracerKey:          os.Getenv("TRACER_SERVICE_KEY"),
+		RubeOwidNextURL:    os.Getenv("RUBE_OWID_NEXT_URL"),
 	}
 }

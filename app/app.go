@@ -10,4 +10,5 @@ type Application struct {
 	UserStore    *user.Store
 	TokenService *token.Service
 	Tracer       *tracer.Client
+	RubeOwidNextURL string
 }
