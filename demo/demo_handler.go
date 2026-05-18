@@ -75,6 +75,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		h.publisher.Publish(h.topicID, pubsub.DemoRegisteredPayload{
 			UserID:    u.ID.String(),
 			ExpiresAt: expiresAt,
+			TraceID:   r.Header.Get("X-Trace-ID"),
 		})
 	}
 

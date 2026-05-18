@@ -16,6 +16,7 @@ type Publisher struct {
 type DemoRegisteredPayload struct {
 	UserID    string    `json:"userId"`
 	ExpiresAt time.Time `json:"expiresAt"`
+	TraceID   string    `json:"traceId,omitempty"`
 }
 
 func NewPublisher(ctx context.Context, projectID string) (*Publisher, error) {
