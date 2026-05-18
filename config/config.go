@@ -8,15 +8,17 @@ import (
 )
 
 type Config struct {
-	Port                string
-	DatabaseURL         string
-	JWTPrivateKey       string
-	JWTPublicKey        string
-	RefreshTokenPepper  string
-	AllowedOrigins      []string
-	TracerURL           string
-	TracerKey           string
-	RubeOwidNextURL     string
+	Port                       string
+	DatabaseURL                string
+	JWTPrivateKey              string
+	JWTPublicKey               string
+	RefreshTokenPepper         string
+	AllowedOrigins             []string
+	TracerURL                  string
+	TracerKey                  string
+	RubeOwidNextURL            string
+	PubSubProjectID            string
+	PubSubDemoRegisteredTopicID string
 }
 
 func parseOrigins(s string) []string {
@@ -32,14 +34,16 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:               os.Getenv("PORT"),
-		DatabaseURL:        os.Getenv("DATABASE_URL"),
-		JWTPrivateKey:      os.Getenv("JWT_PRIVATE_KEY"),
-		JWTPublicKey:       os.Getenv("JWT_PUBLIC_KEY"),
-		RefreshTokenPepper: os.Getenv("REFRESH_TOKEN_PEPPER"),
-		AllowedOrigins:     parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
-		TracerURL:          os.Getenv("TRACER_SERVICE_URL"),
-		TracerKey:          os.Getenv("TRACER_SERVICE_KEY"),
-		RubeOwidNextURL:    os.Getenv("RUBE_OWID_NEXT_URL"),
+		Port:                        os.Getenv("PORT"),
+		DatabaseURL:                 os.Getenv("DATABASE_URL"),
+		JWTPrivateKey:               os.Getenv("JWT_PRIVATE_KEY"),
+		JWTPublicKey:                os.Getenv("JWT_PUBLIC_KEY"),
+		RefreshTokenPepper:          os.Getenv("REFRESH_TOKEN_PEPPER"),
+		AllowedOrigins:              parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		TracerURL:                   os.Getenv("TRACER_SERVICE_URL"),
+		TracerKey:                   os.Getenv("TRACER_SERVICE_KEY"),
+		RubeOwidNextURL:             os.Getenv("RUBE_OWID_NEXT_URL"),
+		PubSubProjectID:             os.Getenv("PUBSUB_PROJECT_ID"),
+		PubSubDemoRegisteredTopicID: "demo-registered",
 	}
 }

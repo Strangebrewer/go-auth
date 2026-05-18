@@ -27,9 +27,28 @@ func Connect(ctx context.Context, mongoURI string) (*mongo.Client, *mongo.Databa
 			Keys:    bson.D{{Key: "email", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
+		{
+			Keys:    bson.D{{Key: "expiresAt", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(0).SetSparse(true),
+		},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("db_connection: failed to create user indexes: %w", err)
+	}
+
+	ipAttempts := database.Collection("demo_ip_attempts")
+	_, err = ipAttempts.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "ip", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys:    bson.D{{Key: "firstSeen", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(86400),
+		},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("db_connection: failed to create demo_ip_attempts indexes: %w", err)
 	}
 
 	tokens := database.Collection("refresh_tokens")

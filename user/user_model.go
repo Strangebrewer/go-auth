@@ -13,6 +13,8 @@ type User struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Disabled     bool
+	IsDemo       bool
+	ExpiresAt    *time.Time
 }
 
 type PublicUser struct {

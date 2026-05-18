@@ -45,7 +45,7 @@ func NewService(store *Store, privateKeyPEM, pepper string) (*Service, error) {
 }
 
 func (s *Service) IssueForUser(ctx context.Context, userID uuid.UUID) (*ExchangeResult, error) {
-	access, err := s.mintAccessJWT(userID)
+	access, err := s.mintAccessJWT(userID, false)
 	if err != nil {
 		return nil, fmt.Errorf("mint access token: %w", err)
 	}
@@ -88,7 +88,26 @@ func (s *Service) Revoke(ctx context.Context, refreshPlain string) error {
 	return s.store.RevokeByID(ctx, old.ID)
 }
 
-func (s *Service) mintAccessJWT(userID uuid.UUID) (string, error) {
+func (s *Service) IssueForDemoUser(ctx context.Context, userID uuid.UUID) (*ExchangeResult, error) {
+	access, err := s.mintAccessJWT(userID, true)
+	if err != nil {
+		return nil, fmt.Errorf("mint access token: %w", err)
+	}
+
+	plain, hash, err := s.mintRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("mint refresh token: %w", err)
+	}
+
+	expiresAt := time.Now().UTC().Add(s.refreshTTL)
+	if err := s.store.Create(ctx, userID, hash, expiresAt); err != nil {
+		return nil, fmt.Errorf("store refresh token: %w", err)
+	}
+
+	return &ExchangeResult{AccessToken: access, RefreshToken: plain}, nil
+}
+
+func (s *Service) mintAccessJWT(userID uuid.UUID, isDemo bool) (string, error) {
 	now := time.Now().UTC()
 	jti, err := uuid.NewV7()
 	if err != nil {
@@ -96,11 +115,12 @@ func (s *Service) mintAccessJWT(userID uuid.UUID) (string, error) {
 	}
 
 	claims := jwt.MapClaims{
-		"sub": userID.String(),
-		"typ": "access",
-		"iat": now.Unix(),
-		"exp": now.Add(s.accessTTL).Unix(),
-		"jti": jti.String(),
+		"sub":    userID.String(),
+		"typ":    "access",
+		"iat":    now.Unix(),
+		"exp":    now.Add(s.accessTTL).Unix(),
+		"jti":    jti.String(),
+		"isDemo": isDemo,
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

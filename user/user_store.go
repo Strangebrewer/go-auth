@@ -20,12 +20,14 @@ var (
 )
 
 type userDoc struct {
-	ID           string    `bson:"_id"`
-	Email        string    `bson:"email"`
-	PasswordHash string    `bson:"passwordHash"`
-	CreatedAt    time.Time `bson:"createdAt"`
-	UpdatedAt    time.Time `bson:"updatedAt"`
-	Disabled     bool      `bson:"disabled"`
+	ID           string     `bson:"_id"`
+	Email        string     `bson:"email"`
+	PasswordHash string     `bson:"passwordHash"`
+	CreatedAt    time.Time  `bson:"createdAt"`
+	UpdatedAt    time.Time  `bson:"updatedAt"`
+	Disabled     bool       `bson:"disabled"`
+	IsDemo       bool       `bson:"isDemo,omitempty"`
+	ExpiresAt    *time.Time `bson:"expiresAt,omitempty"`
 }
 
 func (d userDoc) toDomain() (User, error) {
@@ -40,6 +42,8 @@ func (d userDoc) toDomain() (User, error) {
 		CreatedAt:    d.CreatedAt,
 		UpdatedAt:    d.UpdatedAt,
 		Disabled:     d.Disabled,
+		IsDemo:       d.IsDemo,
+		ExpiresAt:    d.ExpiresAt,
 	}, nil
 }
 
@@ -105,6 +109,36 @@ func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (User, error) {
 		}
 		return User{}, fmt.Errorf("find user by id: %w", err)
 	}
+	return doc.toDomain()
+}
+
+func (s *Store) CreateDemo(ctx context.Context, email, password string, expiresAt time.Time) (User, error) {
+	hash, err := hashPassword(password)
+	if err != nil {
+		return User{}, fmt.Errorf("hash password: %w", err)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return User{}, fmt.Errorf("generate id: %w", err)
+	}
+
+	now := time.Now().UTC()
+	doc := userDoc{
+		ID:           id.String(),
+		Email:        email,
+		PasswordHash: hash,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Disabled:     false,
+		IsDemo:       true,
+		ExpiresAt:    &expiresAt,
+	}
+
+	if _, err := s.col.InsertOne(ctx, doc); err != nil {
+		return User{}, fmt.Errorf("create demo user: %w", err)
+	}
+
 	return doc.toDomain()
 }
 

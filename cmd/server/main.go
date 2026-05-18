@@ -13,7 +13,9 @@ import (
 	"github.com/Strangebrewer/go-auth/app"
 	"github.com/Strangebrewer/go-auth/config"
 	"github.com/Strangebrewer/go-auth/db_connection"
+	"github.com/Strangebrewer/go-auth/demo"
 	"github.com/Strangebrewer/go-auth/middleware"
+	"github.com/Strangebrewer/go-auth/pubsub"
 	"github.com/Strangebrewer/go-auth/server"
 	"github.com/Strangebrewer/go-auth/token"
 	"github.com/Strangebrewer/go-auth/tracer"
@@ -51,11 +53,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	var publisher *pubsub.Publisher
+	if cfg.PubSubProjectID != "" {
+		publisher, err = pubsub.NewPublisher(ctx, cfg.PubSubProjectID)
+		if err != nil {
+			slog.Warn("failed to initialize pubsub publisher", "error", err)
+		}
+	}
+
 	application := &app.Application{
-		UserStore:       user.NewStore(db),
-		TokenService:    tokenService,
-		Tracer:          tracer.NewClient(cfg.TracerURL, cfg.TracerKey, "go-auth"),
-		RubeOwidNextURL: cfg.RubeOwidNextURL,
+		UserStore:             user.NewStore(db),
+		TokenService:          tokenService,
+		Tracer:                tracer.NewClient(cfg.TracerURL, cfg.TracerKey, "go-auth"),
+		RubeOwidNextURL:       cfg.RubeOwidNextURL,
+		Publisher:             publisher,
+		DemoStore:             demo.NewStore(db),
+		DemoRegisteredTopicID: cfg.PubSubDemoRegisteredTopicID,
 	}
 
 	port := cfg.Port
@@ -84,6 +97,10 @@ func main() {
 	if err := srv.HTTPServer.Shutdown(shutCtx); err != nil {
 		slog.Error("server shutdown failed", "error", err)
 		os.Exit(1)
+	}
+
+	if publisher != nil {
+		publisher.Close()
 	}
 	slog.Info("server stopped")
 }

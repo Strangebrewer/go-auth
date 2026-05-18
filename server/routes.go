@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Strangebrewer/go-auth/app"
+	"github.com/Strangebrewer/go-auth/demo"
 	"github.com/Strangebrewer/go-auth/health"
 	"github.com/Strangebrewer/go-auth/token"
 	"github.com/Strangebrewer/go-auth/user"
@@ -15,4 +16,5 @@ func registerRoutes(r chi.Router, application *app.Application, authMiddleware f
 	r.Get("/health", health.Handler)
 	r.Mount("/users", user.Routes(application.UserStore, application.TokenService, authMiddleware))
 	r.Mount("/token", token.Routes(application.TokenService, authMiddleware))
+	r.Mount("/demo", demo.Routes(application.UserStore, application.TokenService, application.DemoStore, application.Publisher, application.DemoRegisteredTopicID))
 }
