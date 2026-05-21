@@ -52,7 +52,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(publicUser(u.ID, u.Email))
+	_ = json.NewEncoder(w).Encode(publicUser(u.ID, u.Email, u.IsDemo))
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +95,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(LoginResponse{
-		User:         publicUser(u.ID, u.Email),
+		User:         publicUser(u.ID, u.Email, u.IsDemo),
 		AccessToken:  result.AccessToken,
 		RefreshToken: result.RefreshToken,
 	})
@@ -126,5 +126,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(publicUser(u.ID, u.Email))
+	_ = json.NewEncoder(w).Encode(publicUser(u.ID, u.Email, u.IsDemo))
 }

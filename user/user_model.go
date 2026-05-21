@@ -18,8 +18,9 @@ type User struct {
 }
 
 type PublicUser struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
+	ID     string `json:"id"`
+	Email  string `json:"email"`
+	IsDemo bool   `json:"isDemo"`
 }
 
 type CreateUserRequest struct {
@@ -33,9 +34,10 @@ type LoginResponse struct {
 	RefreshToken string     `json:"refreshToken"`
 }
 
-func publicUser(id uuid.UUID, email string) PublicUser {
+func publicUser(id uuid.UUID, email string, isDemo bool) PublicUser {
 	return PublicUser{
-		ID:    id.String(),
-		Email: email,
+		ID:     id.String(),
+		Email:  email,
+		IsDemo: isDemo,
 	}
 }
