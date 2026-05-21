@@ -64,7 +64,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.tokenService.IssueForDemoUser(r.Context(), u.ID)
+	result, err := h.tokenService.IssueForDemoUser(r.Context(), u.ID, expiresAt)
 	if err != nil {
 		slog.Error("demo register: issue tokens", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)

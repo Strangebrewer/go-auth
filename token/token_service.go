@@ -45,7 +45,7 @@ func NewService(store *Store, privateKeyPEM, pepper string) (*Service, error) {
 }
 
 func (s *Service) IssueForUser(ctx context.Context, userID uuid.UUID) (*ExchangeResult, error) {
-	access, err := s.mintAccessJWT(userID, false)
+	access, err := s.mintAccessJWT(userID, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("mint access token: %w", err)
 	}
@@ -88,8 +88,8 @@ func (s *Service) Revoke(ctx context.Context, refreshPlain string) error {
 	return s.store.RevokeByID(ctx, old.ID)
 }
 
-func (s *Service) IssueForDemoUser(ctx context.Context, userID uuid.UUID) (*ExchangeResult, error) {
-	access, err := s.mintAccessJWT(userID, true)
+func (s *Service) IssueForDemoUser(ctx context.Context, userID uuid.UUID, expiresAt time.Time) (*ExchangeResult, error) {
+	access, err := s.mintAccessJWT(userID, true, &expiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("mint access token: %w", err)
 	}
@@ -99,15 +99,15 @@ func (s *Service) IssueForDemoUser(ctx context.Context, userID uuid.UUID) (*Exch
 		return nil, fmt.Errorf("mint refresh token: %w", err)
 	}
 
-	expiresAt := time.Now().UTC().Add(s.refreshTTL)
-	if err := s.store.Create(ctx, userID, hash, expiresAt); err != nil {
+	refreshExpiresAt := time.Now().UTC().Add(s.refreshTTL)
+	if err := s.store.Create(ctx, userID, hash, refreshExpiresAt); err != nil {
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
 
 	return &ExchangeResult{AccessToken: access, RefreshToken: plain}, nil
 }
 
-func (s *Service) mintAccessJWT(userID uuid.UUID, isDemo bool) (string, error) {
+func (s *Service) mintAccessJWT(userID uuid.UUID, isDemo bool, demoExpiresAt *time.Time) (string, error) {
 	now := time.Now().UTC()
 	jti, err := uuid.NewV7()
 	if err != nil {
@@ -121,6 +121,9 @@ func (s *Service) mintAccessJWT(userID uuid.UUID, isDemo bool) (string, error) {
 		"exp":    now.Add(s.accessTTL).Unix(),
 		"jti":    jti.String(),
 		"isDemo": isDemo,
+	}
+	if demoExpiresAt != nil {
+		claims["demoExpiresAt"] = demoExpiresAt.Unix()
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

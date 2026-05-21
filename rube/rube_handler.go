@@ -23,8 +23,9 @@ var words = []string{
 }
 
 type ChainRequest struct {
-	UserId string   `json:"userId"`
-	Words  []string `json:"words"`
+	UserId    string     `json:"userId"`
+	Words     []string   `json:"words"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
 type Handler struct {
@@ -57,6 +58,7 @@ func (h *Handler) Chain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.UserId = idStr
+	req.ExpiresAt = middleware.ExpiresAtFromContext(r.Context())
 	traceID := r.Header.Get("X-Trace-ID")
 	word := words[rand.Intn(len(words))]
 	req.Words = append(req.Words, word)
