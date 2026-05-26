@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func Connect(ctx context.Context, mongoURI string) (*mongo.Client, *mongo.Database, error) {
+func Connect(ctx context.Context, mongoURI, dbName string) (*mongo.Client, *mongo.Database, error) {
 	client, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		return nil, nil, fmt.Errorf("db_connection: failed to connect: %w", err)
@@ -19,7 +19,7 @@ func Connect(ctx context.Context, mongoURI string) (*mongo.Client, *mongo.Databa
 		return nil, nil, fmt.Errorf("db_connection: failed to ping: %w", err)
 	}
 
-	database := client.Database("auth")
+	database := client.Database(dbName)
 
 	users := database.Collection("users")
 	_, err = users.Indexes().CreateMany(ctx, []mongo.IndexModel{

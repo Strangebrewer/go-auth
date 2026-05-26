@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port                       string
 	DatabaseURL                string
+	DBName                     string
 	JWTPrivateKey              string
 	JWTPublicKey               string
 	RefreshTokenPepper         string
@@ -33,9 +34,15 @@ func Load() *Config {
 		_ = godotenv.Load(".env.local")
 	}
 
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "auth"
+	}
+
 	return &Config{
 		Port:                        os.Getenv("PORT"),
 		DatabaseURL:                 os.Getenv("DATABASE_URL"),
+		DBName:                      dbName,
 		JWTPrivateKey:               os.Getenv("JWT_PRIVATE_KEY"),
 		JWTPublicKey:                os.Getenv("JWT_PUBLIC_KEY"),
 		RefreshTokenPepper:          os.Getenv("REFRESH_TOKEN_PEPPER"),

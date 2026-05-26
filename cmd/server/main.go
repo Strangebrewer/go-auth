@@ -29,7 +29,7 @@ func main() {
 	cfg := config.Load()
 
 	ctx := context.Background()
-	mongoClient, db, err := db_connection.Connect(ctx, cfg.DatabaseURL)
+	mongoClient, db, err := db_connection.Connect(ctx, cfg.DatabaseURL, cfg.DBName)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
