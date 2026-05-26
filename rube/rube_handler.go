@@ -38,7 +38,7 @@ func NewHandler(nextURL string, tc *tracer.Client) *Handler {
 	return &Handler{
 		nextURL: nextURL,
 		tracer:  tc,
-		client:  &http.Client{Timeout: 15 * time.Second},
+		client:  &http.Client{Timeout: 60 * time.Second},
 	}
 }
 

@@ -51,6 +51,11 @@ func Load() *Config {
 		TracerKey:                   os.Getenv("TRACER_SERVICE_KEY"),
 		RubeOwidNextURL:             os.Getenv("RUBE_OWID_NEXT_URL"),
 		PubSubProjectID:             os.Getenv("PUBSUB_PROJECT_ID"),
-		PubSubDemoRegisteredTopicID: "demo-registered",
+		PubSubDemoRegisteredTopicID: func() string {
+			if v := os.Getenv("PUBSUB_TOPIC_DEMO_REGISTERED"); v != "" {
+				return v
+			}
+			return "demo-registered"
+		}(),
 	}
 }
