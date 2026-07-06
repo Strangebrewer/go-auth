@@ -50,6 +50,7 @@ token/
 go-auth has a `token/token_service.go` — a service layer between handler and store. This is the only domain in any Go service that warrants a service layer (per the architecture: service layer only where there's real logic beyond CRUD).
 
 The token service owns:
+
 - Minting access JWTs (RSA-signed, 15 min TTL)
 - Minting refresh tokens (random bytes, stored as SHA-256 hash + pepper)
 - Token rotation on refresh (revoke old, issue new pair)
@@ -58,12 +59,14 @@ The token service owns:
 ### Auth Middleware Usage
 
 Unlike other services which apply `middleware.RequireAuth` broadly, go-auth applies it selectively:
+
 - **Unprotected**: `POST /users/register`, `POST /users/login`, `POST /token/refresh`
 - **Protected**: `GET /users/me`, `POST /token/logout`
 
 ### Both RSA Keys Required
 
 Other services only need `JWT_PUBLIC_KEY`. go-auth needs both:
+
 - `JWT_PRIVATE_KEY` — for signing access tokens
 - `JWT_PUBLIC_KEY` — for verifying access tokens on protected endpoints
 - `REFRESH_TOKEN_PEPPER` — mixed into refresh token hashing
@@ -133,14 +136,14 @@ Integration tests via testcontainers — `mongo:6` container, no mocks. `TestMai
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `PORT` | HTTP port (defaults to 8080) |
-| `DATABASE_URL` | MongoDB URI (`mongodb+srv://user:pass@cluster.mongodb.net/`) |
-| `JWT_PRIVATE_KEY` | RSA private key PEM for signing access tokens |
-| `JWT_PUBLIC_KEY` | RSA public key PEM for verifying access tokens on protected endpoints |
-| `REFRESH_TOKEN_PEPPER` | Secret mixed into refresh token hashing |
-| `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins |
+| Variable               | Description                                                           |
+| ---------------------- | --------------------------------------------------------------------- |
+| `PORT`                 | HTTP port (defaults to 8080)                                          |
+| `DATABASE_URL`         | MongoDB URI (`mongodb+srv://user:pass@cluster.mongodb.net/`)          |
+| `JWT_PRIVATE_KEY`      | RSA private key PEM for signing access tokens                         |
+| `JWT_PUBLIC_KEY`       | RSA public key PEM for verifying access tokens on protected endpoints |
+| `REFRESH_TOKEN_PEPPER` | Secret mixed into refresh token hashing                               |
+| `ALLOWED_ORIGINS`      | Comma-separated list of allowed CORS origins                          |
 
 Copy `.env.example` to `.env.local` for local dev. Never commit `.env.local`.
 

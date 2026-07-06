@@ -9,11 +9,11 @@ import (
 )
 
 type Application struct {
-	UserStore               *user.Store
-	TokenService            *token.Service
-	Tracer                  *tracer.Client
-	RubeOwidNextURL         string
-	Publisher               *pubsub.Publisher
-	DemoStore               *demo.Store
-	DemoRegisteredTopicID   string
+	UserStore             *user.Store
+	TokenService          *token.Service
+	Tracer                *tracer.Client
+	RubeOwidNextURL       string
+	Publisher             *pubsub.Publisher
+	DemoStore             *demo.Store
+	DemoRegisteredTopicID string
 }

@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	demoTTL      = 2 * time.Hour
-	ipLimit      = 3
-	passwordLen  = 16
+	demoTTL       = 2 * time.Hour
+	ipLimit       = 3
+	passwordLen   = 16
 	passwordChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 

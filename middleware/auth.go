@@ -16,7 +16,7 @@ import (
 type contextKey int
 
 const (
-	userIDKey    contextKey = iota
+	userIDKey contextKey = iota
 	isDemoKey
 	expiresAtKey
 )
